@@ -127,7 +127,7 @@ def interactive():
 
     print colors.normal
 
-NAME_MAP = {"ms-sql-s": "mssql",
+MEDUSA_MAP = {"ms-sql-s": "mssql",
             "microsoft-ds": "smbnt",
             "pcanywheredata": "pcanywhere",
             "postgresql": "postgres",
@@ -141,6 +141,17 @@ NAME_MAP = {"ms-sql-s": "mssql",
             "iss-realsecure": "vmauthd",
             "snmptrap": "snmp"}
 
+PATATOR_MAP = {"mssql_login": "mssql",
+              "microsoft-ds": "smb_login",
+              "ftp": "ftp_login",
+              "login": "rlogin_login",
+              "smtps": "smtp_login",
+              "submission": "smtp_login",
+              "imaps": "imap_login",
+              "pop3s": "pop_login",
+              "iss-realsecure": "vmauthd_login",
+              "snmptrap": "snmp_login"}
+
 def make_dic_gnmap():
     global loading
     global services
@@ -150,23 +161,24 @@ def make_dic_gnmap():
                  'exec','login','microsoft-ds','smtp', 'smtps','submission',
                  'svn','iss-realsecure','snmptrap','snmp']
 
-
     port = None
     with open(args.file, 'r') as nmap_file:
         for line in nmap_file:
             for name in supported:
                 matches = re.compile(r'([0-9][0-9]*)/open/[a-z][a-z]*//' + name)
                 try:
-                    port =  matches.findall(line)[0]
+                    port = matches.findall(line)[0]
                 except:
                     continue
 
-                ip = re.findall( r'[0-9]+(?:\.[0-9]+){3}', line)
+                ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', line)
                 tmp_ports = matches.findall(line)
 
                 for tmp_port in tmp_ports:
-
-                    name = NAME_MAP.get(name, name)
+                    if args.use_patator:
+                        name = PATATOR_MAP.get(name, name)
+                    else:
+                        name = MEDUSA_MAP.get(name, name)
 
                     if name in services:
                         if tmp_port in services[name]:
@@ -174,8 +186,7 @@ def make_dic_gnmap():
                         else:
                             services[name][tmp_port] = ip
                     else:
-                        services[name] = {tmp_port:ip}
-
+                       services[name] = {tmp_port:ip}
     loading = True
 
 def make_dic_xml():
@@ -224,8 +235,10 @@ def make_dic_xml():
                 tmp_port = pn.encode("utf-8")
 
                 if name in supported:
-
-                    name = NAME_MAP.get(name, name)
+                    if args.use_patator:
+                        name = PATATOR_MAP.get(name, name)
+                    else:
+                        name = MEDUSA_MAP.get(name, name)
                     if name in services:
                         if tmp_port in services[name]:
                             services[name][tmp_port] += iplist
@@ -235,10 +248,9 @@ def make_dic_xml():
                         services[name] = {tmp_port:iplist}
     loading = True
 
-
-def brute(service,port,fname,output):
+def brute(service, port, fname, output):
     if args.userlist is None and args.username is None:
-        userlist = 'wordlist/'+service+'/user'
+        userlist = 'wordlist/' + service + '/user'
         uarg = '-U'
     elif args.userlist:
         userlist = args.userlist
@@ -268,7 +280,26 @@ def brute(service,port,fname,output):
         aarg = ''
         auth = ''
 
-    p = subprocess.Popen(['medusa', '-b', '-H', fname, uarg, userlist, parg, passlist, '-M', service, '-t', args.threads, '-n', port, '-T', args.hosts, cont, aarg, auth], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=-1)
+    if args.use_patator is False:
+        p = subprocess.Popen(['medusa',
+                              '-b',
+                              '-H', fname, uarg, userlist, parg, passlist,
+                              '-M', service,
+                              '-t', args.threads,
+                              '-n', port,
+                              '-T', args.hosts, cont, aarg, auth
+                              ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=-1)
+    else:
+        host = open(fname,'r')
+        for line in host:
+	    print(line[:-1], service)
+            p = subprocess.Popen(['patator', service,
+                                  'host='+ line[:-1],
+                                  'port='+ port,
+                                  'user=' + userlist,
+                                  ('auth_key=' if service == "snmp_login" else 'password=' + passlist),
+                                  '-l', output, '-L', 'patator'
+                                  ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=-1)
 
     out = "[" + colors.green + "+" + colors.normal + "] "
     output_file = output + '/' + port + '-' + service + '-success.txt'
@@ -320,9 +351,13 @@ def parse_args():
     menu_group.add_argument('-P', '--passlist', help="reference a custom password file", default=None)
     menu_group.add_argument('-u', '--username', help="specify a single username", default=None)
     menu_group.add_argument('-p', '--password', help="specify a single password", default=None)
-    menu_group.add_argument('-c', '--continuous', help="keep brute-forcing after success", default=False, action='store_true')
-    menu_group.add_argument('-i', '--interactive', help="interactive mode", default=False, action='store_true')    
-    menu_group.add_argument('-m', '--modules', help="dump a list of available modules to brute", default=False, action='store_true')    
+    menu_group.add_argument('-c', '--continuous', help="keep brute-forcing after success", default=False,
+                            action='store_true')
+    menu_group.add_argument('-i', '--interactive', help="interactive mode", default=False, action='store_true')
+    menu_group.add_argument('-m', '--modules', help="dump a list of available modules to brute", default=False,
+                            action='store_true')
+    menu_group.add_argument('-Q', '--use_patator', help="use patator instead of medusa", default=False,
+                            action='store_true')
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
@@ -354,8 +389,16 @@ if __name__ == "__main__":
     if not os.path.exists(args.output):
         os.mkdir(args.output)
 
-    if os.system("command -v medusa > /dev/null") != 0:
-        sys.stderr.write("Command medusa not found. Please install medusa before using brutespray")
+    if args.use_patator:
+        prog = 'patator'
+    else:
+        prog = 'medusa'
+    tmpcmd = 'command -v '
+    tmpcmd += prog
+    tmpcmd += ' > /dev/null'
+
+    if os.system(tmpcmd) != 0:
+        sys.stderr.write("Command {} not found. Please install {} before using brutespray".format(prog, prog))
         exit(3)
 
     if args.file is None:
