@@ -175,10 +175,75 @@ def make_dic_gnmap():
                 tmp_ports = matches.findall(line)
 
                 for tmp_port in tmp_ports:
+<<<<<<< HEAD
                     if args.use_patator:
                         name = PATATOR_MAP.get(name, name)
                     else:
                         name = MEDUSA_MAP.get(name, name)
+=======
+                    if args.use_patator is False:
+                        if name == "ms-sql-s":
+                            name = "mssql"
+                        if name == "microsoft-ds":
+                            name = "smbnt"
+                        if name == "pcanywheredata":
+                            name = "pcanywhere"
+                        if name == "shell":
+                            name = "rsh"
+                        if name == "exec":
+                            name = "rexec"
+                        if name == "login":
+                            name = "rlogin"
+                        if name == "smtps" or name == "submission":
+                            name = "smtp"
+                        if name == "imaps":
+                            name = "imap"
+                        if name == "pop3s":
+                            name = "pop3"
+                        if name == "iss-realsecure":
+                            name = "vmauthd"
+                        if name == "snmptrap":
+                            name = "snmp"
+                        if name in services:
+                            if tmp_port in services[name]:
+                                services[name][tmp_port] += ip
+                            else:
+                                services[name][tmp_port] = ip
+                        else:
+                            services[name] = {tmp_port:ip}
+                    else:
+                        if name == "mssql_login":
+                            name = "mssql"
+                        if name == "microsoft-ds":
+                            name = "smb_login"
+                        if name == "ftp":
+                            name = "ftp_login"
+                        # if name == "pcanywheredata":
+                        #     name = "pcanywhere"
+                        # if name == "shell":
+                        #     name = "rsh"
+                        # if name == "exec":
+                        #     name = "rexec"
+                        if name == "login":
+                            name = "rlogin_login"
+                        if name == "smtps" or name == "submission":
+                            name = "smtp_login"
+                        if name == "imaps":
+                            name = "imap_login"
+                        if name == "pop3s":
+                            name = "pop_login"
+                        if name == "iss-realsecure":
+                            name = "vmauthd_login"
+                        if name == "snmptrap":
+                            name = "snmp_login"
+                        if name in services:
+                            if tmp_port in services[name]:
+                                services[name][tmp_port] += ip
+                            else:
+                                services[name][tmp_port] = ip
+                        else:
+                            services[name] = {tmp_port: ip}
+>>>>>>> no message
 
                     if name in services:
                         if tmp_port in services[name]:
